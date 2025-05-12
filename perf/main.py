@@ -59,7 +59,8 @@ def get_memory_usage(func):
 import asyncio
 import gc
 import json
-from memory_profiler import memory_usage
+import psutil
+import time
 
 from perf.{func.__module__} import {func.__name__} as func
 
@@ -71,7 +72,14 @@ def wrapper():
     else:
         return func()
 
-mem_usage = memory_usage(wrapper, interval=0.01, timeout=30)
+process = psutil.Process()
+mem_usage = []
+start_time = time.time()
+while time.time() - start_time < 30:  # timeout=30 seconds
+    wrapper()
+    mem_usage.append(process.memory_full_info().uss / 1024 / 1024)  # Convert to MB
+    time.sleep(0.01)  # interval=0.01 seconds
+
 print(json.dumps({{
     "peak": max(mem_usage),
     "avg": sum(mem_usage) / len(mem_usage),
@@ -86,7 +94,6 @@ print(json.dumps({{
     )
     result.check_returncode()  # raise if something went wrong
     return json.loads(result.stdout)
-
 
 def get_git_info():
     try:
