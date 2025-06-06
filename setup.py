@@ -14,7 +14,8 @@ from setuptools import Extension, setup
 COMPILE_ARGS = ["-O2", "-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION"]
 
 # Check if extension compilation should be skipped
-skip_ext = os.environ.get("BLACKSHEEP_NO_EXTENSIONS", "0") == "1"
+skip_ext = (os.environ.get("BLACKSHEEP_NO_EXTENSIONS", "0") == "1" or 
+           os.environ.get("BLACKSHEEP_BUILD_PURE", "0") == "1")
 
 # Cython extension module definitions
 EXTENSIONS = [
