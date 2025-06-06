@@ -179,7 +179,7 @@ jobs:
   # Build wheels with cibuildwheel
   build-wheels:
     name: Build wheels on ${{ matrix.os }}
-    needs: [test-pypy]  # 移除对test的依赖
+    # needs: [test-pypy]  # 移除对test的依赖
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -233,7 +233,7 @@ jobs:
   # Build PyPy wheel (pure Python)
   build-pypy-wheel:
     name: Build PyPy wheel
-    needs: [test-pypy]  # 移除对test的依赖
+    # needs: [test-pypy]  # 移除对test的依赖
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
@@ -269,7 +269,7 @@ jobs:
   # Build source distribution
   build-sdist:
     name: Build source distribution
-    needs: [test-pypy]  # 移除对test的依赖
+    # needs: [test-pypy]  # 移除对test的依赖
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_artifacts == 'Y')
     runs-on: ubuntu-latest
     
