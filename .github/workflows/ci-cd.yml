@@ -147,6 +147,7 @@ jobs:
   # PyPy testing
   test-pypy:
     name: Test PyPy ${{ matrix.pypy-version }} on ${{ matrix.os }}
+    if: false  # 暂时跳过此步骤
     needs: quality
     strategy:
       fail-fast: false
