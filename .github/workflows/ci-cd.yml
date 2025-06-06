@@ -190,14 +190,14 @@ jobs:
           fetch-depth: 0
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        uses: pypa/cibuildwheel@v2.23.3
         env:
           # Build specified Python versions
           CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-* pp39-* pp310-* pp311-*
-          
+
           # Skip unnecessary builds
-          CIBW_SKIP: *-musllinux_*
-          
+          CIBW_SKIP: "*-musllinux_*"
+
           # macOS deployment target
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.15
           
@@ -291,3 +291,5 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
