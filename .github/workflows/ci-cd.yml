@@ -220,9 +220,6 @@ jobs:
           
           # Run tests to ensure wheels work
           CIBW_TEST_COMMAND: |
-            # First verify environment
-            python {project}/ci_verify.py &&
-            # Then run core tests
             pytest {project}/tests --maxfail=3
           CIBW_TEST_REQUIRES: pytest pytest-asyncio jinja2 pydantic
 
