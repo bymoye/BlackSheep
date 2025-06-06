@@ -35,11 +35,13 @@ dependencies = [
     "certifi>=2025.4.26",
     "charset-normalizer~=3.4.2",
     "guardpost>=1.0.2",
-    "rodi~=2.0.8",
+    "rodi~=2.0.2",
     "essentials>=1.1.4,<2.0",
     "essentials-openapi>=1.2.0,<2.0",
     "python-dateutil~=2.9.0",
     "itsdangerous~=2.2.0",
+    "h11==0.16.0; platform_python_implementation == 'PyPy'",
+    "httptools==0.6.4; platform_python_implementation != 'PyPy'",
 ]
 
 [tool.setuptools.packages.find]
@@ -52,27 +54,39 @@ version = { attr = "blacksheep.__version__" }
 
 [project.optional-dependencies]
 jinja = ["Jinja2~=3.1.6"]
+pydantic = ["pydantic==2.11.4", "pydantic_core==2.33.2"]
+jwt = ["PyJWT==2.10.1"]
+websockets = ["websockets~=15.0.1"]
+crypto = ["cryptography>=45.0.2,<46.0.0"]
 full = [
     "cryptography>=45.0.2,<46.0.0",
-    "PyJWT~=2.10.1",
+    "PyJWT==2.10.1",
     "websockets~=15.0.1",
     "Jinja2~=3.1.6",
+    "pydantic==2.11.4",
+    "pydantic_core==2.33.2",
 ]
-cython = ["httptools>=0.6.4"]
 dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.26.0",
-    "pytest-cov>=6.0.0",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.26.0",
+    "pytest-cov==6.1.1",
     "black>=25.0.0",
     "isort>=6.0.0",
     "flake8>=7.0.0",
-    "cython>=3.0.0",
+    "cython==3.0.12",
+    "setuptools==80.7.1",
     "build>=1.0.0",
     "wheel>=0.40.0",
     "twine>=5.0.0",
     "cython-lint>=0.12.0",
     "watchdog>=3.0.0",
     "Jinja2~=3.1.6",
+    "Flask[async]==3.1.1",
+    "Hypercorn==0.17.3",
+    "requests==2.32.3",
+    "uvicorn==0.34.2",
+    "pydantic==2.11.4",
+    "pydantic_core==2.33.2",
 ]
 
 [project.urls]
@@ -129,4 +143,3 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
 ]
-purepython = ["h11==0.16.0"]
