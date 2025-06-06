@@ -1,0 +1,268 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      create_release:
+        description: 'Create GitHub release'
+        type: boolean
+        default: true
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  # Pre-release validation checks
+  pre-release-checks:
+    runs-on: ubuntu-latest
+    name: Pre-release Validation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Validate version
+        if: github.event.inputs.version
+        run: |
+          echo "Validating version: ${{ github.event.inputs.version }}"
+          python -c "
+          import re
+          version = '${{ github.event.inputs.version }}'
+          if not re.match(r'^\d+\.\d+\.\d+(?:[ab]\d+|rc\d+)?$', version):
+              raise ValueError(f'Invalid version format: {version}')
+          print(f'Version {version} is valid')
+          "
+
+      - name: Run full test suite
+        run: |
+          make clean
+          make compile
+          pytest tests/ itests/ -v
+
+      - name: Check code quality
+        run: |
+          make check-all
+
+      - name: Build and validate package
+        run: |
+          make build
+          python -m twine check dist/*
+
+  # Build distribution packages
+  build-release:
+    needs: pre-release-checks
+    runs-on: ${{ matrix.os }}
+    name: Build wheels on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-* pp39-* pp310-* pp311-*
+          CIBW_SKIP: *-musllinux_*
+          CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.15
+          CIBW_BEFORE_BUILD: >
+            pip install setuptools wheel &&
+            if python -c "import platform; exit(0 if platform.python_implementation() != 'PyPy' else 1)"; then
+              pip install cython==3.0.12 &&
+              make clean &&
+              cython blacksheep/url.pyx &&
+              cython blacksheep/exceptions.pyx &&
+              cython blacksheep/headers.pyx &&
+              cython blacksheep/cookies.pyx &&
+              cython blacksheep/contents.pyx &&
+              cython blacksheep/messages.pyx &&
+              cython blacksheep/scribe.pyx &&
+              cython blacksheep/baseapp.pyx
+            fi
+          CIBW_TEST_COMMAND: pytest {project}/tests --maxfail=3
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  # Build source distribution
+  build-sdist:
+    needs: pre-release-checks
+    runs-on: ubuntu-latest
+    name: Build source distribution
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build source distribution
+        run: python -m build --sdist
+
+      - name: Verify source distribution
+        run: python -m twine check dist/*
+
+      - name: Upload source distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # Publish to PyPI
+  publish-pypi:
+    needs: [pre-release-checks, build-release, build-sdist]
+    runs-on: ubuntu-latest
+    name: Publish to PyPI
+    environment:
+      name: pypi
+      url: https://pypi.org/p/blacksheep
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: '{wheels-*,sdist}'
+          merge-multiple: true
+
+      - name: List distribution files
+        run: |
+          echo "📦 Distribution files:"
+          ls -la dist/
+          echo ""
+          echo "📊 File count:"
+          echo "Wheels: $(ls dist/*.whl | wc -l)"
+          echo "Sdist: $(ls dist/*.tar.gz | wc -l)"
+
+      - name: Publish to Test PyPI first
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          print-hash: true
+
+      - name: Wait for Test PyPI propagation
+        run: |
+          echo "⏳ Waiting for Test PyPI propagation..."
+          sleep 60
+
+      - name: Test installation from Test PyPI
+        run: |
+          pip install --index-url https://test.pypi.org/simple/ \
+                     --extra-index-url https://pypi.org/simple/ \
+                     blacksheep
+          python -c "import blacksheep; print(f'Successfully installed BlackSheep {blacksheep.__version__}')"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+
+  # Create GitHub Release
+  create-github-release:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    name: Create GitHub Release
+    if: github.event.inputs.create_release == 'true' || github.event_name == 'release'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${{ github.event.release.tag_name }}
+          else
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog for this version
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "## Changes in ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "Full changelog: [CHANGELOG.md](CHANGELOG.md)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+
+  # Post-release validation
+  post-release-validation:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    name: Post-release Validation
+    
+    steps:
+      - name: Wait for PyPI propagation
+        run: |
+          echo "⏳ Waiting for PyPI propagation..."
+          sleep 300  # 5 minutes
+
+      - name: Test installation from PyPI
+        run: |
+          pip install blacksheep
+          python -c "
+          import blacksheep
+          print(f'✅ Successfully installed BlackSheep {blacksheep.__version__} from PyPI')
+          "
+
+      - name: Test basic functionality
+        run: |
+          python -c "
+          from blacksheep import Application
+          app = Application()
+          print('✅ BlackSheep application created successfully')
+          "

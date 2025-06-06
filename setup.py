@@ -1,65 +1,64 @@
 """
-This file is used to specify Python extensions, which are used when using Cython.
-Extensions are used only if the current runtime is CPython and only if there is not an
-environment variable: `BLACKSHEEP_NO_EXTENSIONS=1`.
-The logic is to support PyPy. See:
-https://github.com/Neoteroi/BlackSheep/issues/539#issuecomment-2888631226
+Modern setup.py for Cython extension modules.
+Extensions only used on CPython for PyPy compatibility.
+Can disable extensions via BLACKSHEEP_NO_EXTENSIONS=1.
+Reference: https://github.com/Neoteroi/BlackSheep/issues/539#issuecomment-2888631226
 """
 
 import os
-from setuptools import Extension, setup
 import platform
+from pathlib import Path
+from setuptools import Extension, setup
 
-COMPILE_ARGS = ["-O2"]
+# Optimized compilation arguments
+COMPILE_ARGS = ["-O2", "-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION"]
 
-# Check for environment variable to skip extensions
+# Check if extension compilation should be skipped
 skip_ext = os.environ.get("BLACKSHEEP_NO_EXTENSIONS", "0") == "1"
 
+# Cython extension module definitions
+EXTENSIONS = [
+    "url",
+    "exceptions", 
+    "headers",
+    "cookies",
+    "contents",
+    "messages",
+    "scribe",
+    "baseapp",
+]
 
+
+def create_extensions():
+    """Create extension modules list"""
+    extensions = []
+    base_path = Path("blacksheep")
+    
+    for ext_name in EXTENSIONS:
+        c_file = base_path / f"{ext_name}.c"
+        
+        # Check if C file exists
+        if c_file.exists():
+            extension = Extension(
+                f"blacksheep.{ext_name}",
+                [str(c_file)],
+                extra_compile_args=COMPILE_ARGS,
+                language="c",
+            )
+            extensions.append(extension)
+        else:
+            print(f"Warning: C file not found for {ext_name}, skipping extension")
+    
+    return extensions
+
+
+# Determine whether to compile extensions based on runtime environment
 if platform.python_implementation() == "CPython" and not skip_ext:
-    ext_modules = [
-        Extension(
-            "blacksheep.url",
-            ["blacksheep/url.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.exceptions",
-            ["blacksheep/exceptions.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.headers",
-            ["blacksheep/headers.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.cookies",
-            ["blacksheep/cookies.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.contents",
-            ["blacksheep/contents.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.messages",
-            ["blacksheep/messages.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.scribe",
-            ["blacksheep/scribe.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-        Extension(
-            "blacksheep.baseapp",
-            ["blacksheep/baseapp.c"],
-            extra_compile_args=COMPILE_ARGS,
-        ),
-    ]
+    ext_modules = create_extensions()
+    print(f"Building with {len(ext_modules)} Cython extensions")
 else:
     ext_modules = []
+    reason = "PyPy runtime" if platform.python_implementation() != "CPython" else "extensions disabled"
+    print(f"Building without extensions ({reason})")
 
 setup(ext_modules=ext_modules)
