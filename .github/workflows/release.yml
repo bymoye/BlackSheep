@@ -100,7 +100,12 @@ jobs:
               cython blacksheep/scribe.pyx &&
               cython blacksheep/baseapp.pyx
             fi
-          CIBW_TEST_COMMAND: pytest {project}/tests --maxfail=3
+          CIBW_TEST_COMMAND: |
+            # First verify environment
+            python {project}/ci_verify.py &&
+            # Then run core tests
+            pytest {project}/tests --maxfail=3
+          CIBW_TEST_REQUIRES: pytest pytest-asyncio jinja2 pydantic
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
