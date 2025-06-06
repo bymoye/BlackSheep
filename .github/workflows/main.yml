@@ -167,8 +167,53 @@ jobs:
           path: dist
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == 3.12
 
+  build-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9, "3.10", "3.11", "3.12", "3.13"]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 9
+          submodules: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install black==25.1.0 isort==6.0.1 flake8==7.2.0
+
+      - name: Run tests for Pure-Python Code on ARM64
+        run: |
+          echo "Running unit tests on ARM64..."
+          docker run --rm --platform linux/arm64 -v $PWD:/workspace -w /workspace python:${{ matrix.python-version }}-slim bash -c "
+            pip install -r requirements.txt &&
+            pip install pytest &&
+            pytest tests
+          "
+
+          echo "Running integration tests on ARM64..."
+          docker run --rm --platform linux/arm64 -v $PWD:/workspace -w /workspace python:${{ matrix.python-version }}-slim bash -c "
+            pip install -r requirements.txt &&
+            pip install pytest &&
+            export APP_DEFAULT_ROUTER=false &&
+            pytest itests
+          "
+
   build-cpython-wheels:
-    needs: build
+    needs: [build, build-arm64]
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -223,8 +268,63 @@ jobs:
           name: dist-${{ matrix.os }}-${{ matrix.python-version }}
           path: dist
 
+  build-cpython-wheels-arm64:
+    needs: [build, build-arm64]
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9, "3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 9
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          pip install cython==3.0.12
+          pip install --upgrade build
+
+      - name: Compile Cython extensions
+        run: |
+          make clean
+
+          cython blacksheep/url.pyx
+          cython blacksheep/exceptions.pyx
+          cython blacksheep/headers.pyx
+          cython blacksheep/cookies.pyx
+          cython blacksheep/contents.pyx
+          cython blacksheep/messages.pyx
+          cython blacksheep/scribe.pyx
+          cython blacksheep/baseapp.pyx
+
+      - name: Build wheels (linux arm64)
+        uses: docker://quay.io/pypa/manylinux2014_aarch64
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        with:
+          entrypoint: /github/workspace/.github/workflows/build-manylinux-wheels.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-ubuntu-latest-arm64-${{ matrix.python-version }}
+          path: dist
+
   build-pypy-wheels:
-    needs: build
+    needs: [build, build-arm64]
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -271,7 +371,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    needs: [build, build-cpython-wheels, build-pypy-wheels]
+    needs: [build, build-cpython-wheels, build-cpython-wheels-arm64, build-pypy-wheels]
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_artifacts == 'Y')
     steps:
       - name: Download a distribution artifact
