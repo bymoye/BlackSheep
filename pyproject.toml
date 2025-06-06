@@ -35,13 +35,13 @@ dependencies = [
     "certifi>=2025.4.26",
     "charset-normalizer~=3.4.2",
     "guardpost>=1.0.2",
-    "rodi~=2.0.2",
+    "rodi~=2.0.8",
     "essentials>=1.1.4,<2.0",
     "essentials-openapi>=1.2.0,<2.0",
     "python-dateutil~=2.9.0",
     "itsdangerous~=2.2.0",
     "h11==0.16.0; platform_python_implementation == 'PyPy'",
-    "httptools==0.6.4; platform_python_implementation != 'PyPy'",
+    "httptools>=0.6.4; platform_python_implementation != 'PyPy'",
 ]
 
 [tool.setuptools.packages.find]
@@ -54,17 +54,11 @@ version = { attr = "blacksheep.__version__" }
 
 [project.optional-dependencies]
 jinja = ["Jinja2~=3.1.6"]
-pydantic = ["pydantic==2.11.4", "pydantic_core==2.33.2"]
-jwt = ["PyJWT==2.10.1"]
-websockets = ["websockets~=15.0.1"]
-crypto = ["cryptography>=45.0.2,<46.0.0"]
 full = [
     "cryptography>=45.0.2,<46.0.0",
-    "PyJWT==2.10.1",
+    "PyJWT~=2.10.1",
     "websockets~=15.0.1",
     "Jinja2~=3.1.6",
-    "pydantic==2.11.4",
-    "pydantic_core==2.33.2",
 ]
 dev = [
     "pytest==8.3.5",
@@ -73,6 +67,7 @@ dev = [
     "black>=25.0.0",
     "isort>=6.0.0",
     "flake8>=7.0.0",
+    "PyJWT==2.10.1",
     "cython==3.0.12",
     "setuptools==80.7.1",
     "build>=1.0.0",
