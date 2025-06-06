@@ -131,8 +131,8 @@ jobs:
               cython blacksheep/baseapp.pyx;
             fi
           # Run tests to ensure wheels work
-          CIBW_TEST_COMMAND: "python {project}/ci_verify.py && pytest {project}/tests --maxfail=3"
-          CIBW_TEST_REQUIRES: pytest pytest-asyncio jinja2 pydantic
+          CIBW_TEST_COMMAND: "pip install -e {project}[dev] && python {project}/ci_verify.py && pytest {project}/tests --maxfail=3"
+          CIBW_TEST_REQUIRES: pytest
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
