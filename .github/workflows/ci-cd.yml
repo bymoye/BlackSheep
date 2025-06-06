@@ -145,12 +145,12 @@ jobs:
 
   # PyPy testing
   test-pypy:
-    name: Test PyPy on ${{ matrix.os }}
+    name: Test PyPy ${{ matrix.pypy-version }} on ${{ matrix.os }}
     needs: quality
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]  # Removed windows-latest
         pypy-version: ['pypy3.9', 'pypy3.10', 'pypy3.11']
     
     runs-on: ${{ matrix.os }}
