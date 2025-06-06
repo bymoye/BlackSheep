@@ -86,7 +86,22 @@ jobs:
           CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.15
-          CIBW_BEFORE_BUILD: >
+          # Before build commands
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            pip install setuptools wheel cython==3.0.12 &&
+            python -c "import platform; assert platform.python_implementation() != 'PyPy'" &&
+            python -c "import os, glob; [os.remove(f) for f in glob.glob('blacksheep/*.c') + glob.glob('blacksheep/*.so')]" &&
+            cython blacksheep/url.pyx &&
+            cython blacksheep/exceptions.pyx &&
+            cython blacksheep/headers.pyx &&
+            cython blacksheep/cookies.pyx &&
+            cython blacksheep/contents.pyx &&
+            cython blacksheep/messages.pyx &&
+            cython blacksheep/scribe.pyx &&
+            cython blacksheep/baseapp.pyx
+          
+          # Unix-based systems (macOS, Linux)
+          CIBW_BEFORE_BUILD_LINUX: >
             pip install setuptools wheel &&
             if python -c "import platform; exit(0 if platform.python_implementation() != 'PyPy' else 1)"; then
               pip install cython==3.0.12 &&
@@ -98,13 +113,25 @@ jobs:
               cython blacksheep/contents.pyx &&
               cython blacksheep/messages.pyx &&
               cython blacksheep/scribe.pyx &&
-              cython blacksheep/baseapp.pyx
+              cython blacksheep/baseapp.pyx;
             fi
-          CIBW_TEST_COMMAND: |
-            # First verify environment
-            python {project}/ci_verify.py &&
-            # Then run core tests
-            pytest {project}/tests --maxfail=3
+            
+          CIBW_BEFORE_BUILD_MACOS: >
+            pip install setuptools wheel &&
+            if python -c "import platform; exit(0 if platform.python_implementation() != 'PyPy' else 1)"; then
+              pip install cython==3.0.12 &&
+              make clean &&
+              cython blacksheep/url.pyx &&
+              cython blacksheep/exceptions.pyx &&
+              cython blacksheep/headers.pyx &&
+              cython blacksheep/cookies.pyx &&
+              cython blacksheep/contents.pyx &&
+              cython blacksheep/messages.pyx &&
+              cython blacksheep/scribe.pyx &&
+              cython blacksheep/baseapp.pyx;
+            fi
+          # Run tests to ensure wheels work
+          CIBW_TEST_COMMAND: "python {project}/ci_verify.py && pytest {project}/tests --maxfail=3"
           CIBW_TEST_REQUIRES: pytest pytest-asyncio jinja2 pydantic
 
       - name: Upload wheels

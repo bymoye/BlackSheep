@@ -180,7 +180,8 @@ jobs:
   build-wheels:
     name: Build wheels on ${{ matrix.os }}
     # needs: [test-pypy]  # 移除对test的依赖
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    # if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    if: true
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -204,7 +205,21 @@ jobs:
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.15
           
           # Before build commands
-          CIBW_BEFORE_BUILD: >
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            pip install setuptools wheel cython==3.0.12 &&
+            python -c "import platform; assert platform.python_implementation() != 'PyPy'" &&
+            python -c "import os, glob; [os.remove(f) for f in glob.glob('blacksheep/*.c') + glob.glob('blacksheep/*.so')]" &&
+            cython blacksheep/url.pyx &&
+            cython blacksheep/exceptions.pyx &&
+            cython blacksheep/headers.pyx &&
+            cython blacksheep/cookies.pyx &&
+            cython blacksheep/contents.pyx &&
+            cython blacksheep/messages.pyx &&
+            cython blacksheep/scribe.pyx &&
+            cython blacksheep/baseapp.pyx
+          
+          # Unix-based systems (macOS, Linux)
+          CIBW_BEFORE_BUILD_LINUX: >
             pip install setuptools wheel &&
             if python -c "import platform; exit(0 if platform.python_implementation() != 'PyPy' else 1)"; then
               pip install cython==3.0.12 &&
@@ -216,12 +231,26 @@ jobs:
               cython blacksheep/contents.pyx &&
               cython blacksheep/messages.pyx &&
               cython blacksheep/scribe.pyx &&
-              cython blacksheep/baseapp.pyx
+              cython blacksheep/baseapp.pyx;
+            fi
+            
+          CIBW_BEFORE_BUILD_MACOS: >
+            pip install setuptools wheel &&
+            if python -c "import platform; exit(0 if platform.python_implementation() != 'PyPy' else 1)"; then
+              pip install cython==3.0.12 &&
+              make clean &&
+              cython blacksheep/url.pyx &&
+              cython blacksheep/exceptions.pyx &&
+              cython blacksheep/headers.pyx &&
+              cython blacksheep/cookies.pyx &&
+              cython blacksheep/contents.pyx &&
+              cython blacksheep/messages.pyx &&
+              cython blacksheep/scribe.pyx &&
+              cython blacksheep/baseapp.pyx;
             fi
           
           # Run tests to ensure wheels work
-          CIBW_TEST_COMMAND: |
-            pytest {project}/tests --maxfail=3
+          CIBW_TEST_COMMAND: "python {project}/ci_verify.py && pytest {project}/tests --maxfail=3"
           CIBW_TEST_REQUIRES: pytest pytest-asyncio jinja2 pydantic
 
       - name: Upload wheels
@@ -234,7 +263,8 @@ jobs:
   build-pypy-wheel:
     name: Build PyPy wheel
     # needs: [test-pypy]  # 移除对test的依赖
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    # if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    if: true
     runs-on: ubuntu-latest
     
     steps:
@@ -270,7 +300,8 @@ jobs:
   build-sdist:
     name: Build source distribution
     # needs: [test-pypy]  # 移除对test的依赖
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_artifacts == 'Y')
+    if: true
+    # if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_artifacts == 'Y')
     runs-on: ubuntu-latest
     
     steps:
